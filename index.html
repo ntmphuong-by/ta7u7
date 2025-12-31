@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unit 7 Traffic: Full Auto Game</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap');
+
+        :root {
+            --primary: #2980b9;
+            --secondary: #f39c12;
+            --correct: #27ae60;
+            --wrong: #c0392b;
+            --bg: #ecf0f1;
+            --text: #2c3e50;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: white;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* AUTO TIMER BAR */
+        .timer-bar {
+            height: 6px;
+            background: var(--secondary);
+            width: 0%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 100;
+        }
+
+        /* HEADER */
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .header-controls button {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.5);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: 0.3s;
+        }
+        .header-controls button:hover { background: rgba(255,255,255,0.4); }
+        .header-controls button.active { background: var(--correct); border-color: var(--correct); }
+
+        /* PROGRESS */
+        .progress-track { background: #bdc3c7; height: 8px; width: 100%; }
+        .progress-fill { background: #3498db; height: 100%; width: 0%; transition: width 0.3s; }
+
+        /* CONTENT AREA */
+        main {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section-tag {
+            background: #8e44ad;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 5px;
+            align-self: flex-start;
+            font-weight: bold;
+            font-size: 0.85rem;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        /* DIALOGUE & READING BOX */
+        .context-box {
+            background: #fdfbf7;
+            border-left: 5px solid var(--secondary);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            max-height: 250px;
+            overflow-y: auto;
+            font-size: 1rem;
+            line-height: 1.6;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+        }
+
+        .role { font-weight: 800; margin-right: 5px; }
+        .role.Mark { color: #2980b9; }
+        .role.Lan { color: #c0392b; }
+        .role.Narrator { color: #7f8c8d; font-style: italic; }
+
+        .audio-trigger {
+            margin-top: 10px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+        .audio-trigger.playing { background: var(--correct); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% {opacity: 1;} 50% {opacity: 0.7;} 100% {opacity: 1;} }
+
+        /* VISUALS */
+        .visual-box {
+            font-size: 4rem;
+            text-align: center;
+            margin: 10px 0;
+            animation: popIn 0.5s;
+        }
+        @keyframes popIn { from {transform: scale(0.8); opacity: 0;} to {transform: scale(1); opacity: 1;} }
+
+        /* QUESTION */
+        .question-text {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+
+        .options-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .option-card {
+            background: white;
+            border: 2px solid #bdc3c7;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .option-card:hover:not(.disabled) {
+            border-color: var(--primary);
+            background: #eaf2f8;
+            transform: translateX(5px);
+        }
+
+        .option-card.correct { background: #d5f5e3; border-color: var(--correct); color: #1e8449; font-weight: bold; }
+        .option-card.wrong { background: #fadbd8; border-color: var(--wrong); color: #922b21; opacity: 0.7; }
+        .option-card.disabled { pointer-events: none; }
+
+        /* FEEDBACK PANEL */
+        .feedback-panel {
+            margin-top: 20px;
+            background: #e8f8f5;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #a3e4d7;
+            display: none;
+            animation: slideUp 0.3s ease-out;
+        }
+        .feedback-panel.show { display: block; }
+        @keyframes slideUp { from {transform: translateY(20px); opacity:0;} to {transform: translateY(0); opacity:1;} }
+
+        .fb-status { font-size: 1.2rem; font-weight: 800; display: block; margin-bottom: 5px; }
+        .fb-trans { font-style: italic; color: #555; display: block; margin-bottom: 10px; }
+        .fb-exp { color: #2980b9; font-weight: 700; line-height: 1.4; }
+        .auto-next-msg { font-size: 0.85rem; color: #95a5a6; text-align: right; margin-top: 10px; font-style: italic; }
+
+        /* START SCREEN */
+        .start-screen {
+            text-align: center;
+            padding: 50px;
+        }
+        .btn-large {
+            font-size: 1.5rem;
+            padding: 15px 40px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 5px 15px rgba(41, 128, 185, 0.4);
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="timer-bar" class="timer-bar"></div>
+    
+    <header>
+        <div style="font-weight: 800; font-size: 1.2rem;">🚦 Traffic Master V9</div>
+        <div class="header-controls">
+            <button id="bgm-btn" onclick="toggleBGM()">🎵 Nhạc: TẮT</button>
+            <span style="margin-left: 10px;">Điểm: <strong id="score">0</strong></span>
+        </div>
+    </header>
+    
+    <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
+
+    <main id="main-area">
+        </main>
+</div>
+
+<script>
+    /* =================================================================
+       1. DATA CONTENT (CHUẨN UNIT 7 SGK)
+       ================================================================= */
+    
+    // Getting Started Dialogue
+    const dialogueGS = [
+        {r: "Lan", t: "Hi, Mark. How are you?"},
+        {r: "Mark", t: "Good, thanks. And you? What did you do last Sunday?"},
+        {r: "Lan", t: "I'm fine. Last Sunday afternoon, I cycled round the lake near my home."},
+        {r: "Mark", t: "That sounds really healthy. By the way, do you often cycle to school too?"},
+        {r: "Lan", t: "Yes, but sometimes my mum takes me on her motorbike."},
+        {r: "Mark", t: "How far is it from your home to school?"},
+        {r: "Lan", t: "It's about two kilometres."},
+        {r: "Mark", t: "How long does it take you to cycle there?"},
+        {r: "Lan", t: "About 10 minutes. Sometimes, when there are traffic jams, it takes longer."},
+        {r: "Mark", t: "You should be careful, especially when you cross the road."},
+        {r: "Lan", t: "Right. The roads get really crowded."},
+        {r: "Mark", t: "Hey, how about going cycling round the lake this Sunday?"},
+        {r: "Lan", t: "Great! Can you come to my house at 3 p.m.?"},
+        {r: "Mark", t: "OK, Lan. See you then."}
+    ];
+
+    // Skills 1 Reading Rules
+    const readingRules = [
+        {r: "Narrator", t: "These are some rules about road safety. It is important to obey these rules when you are a road user."},
+        {r: "Narrator", t: "Pedestrians."},
+        {r: "Narrator", t: "Always look carefully when you cross the street."},
+        {r: "Narrator", t: "Use the pavement or footpath."},
+        {r: "Narrator", t: "Walk across the street at the zebra crossing."},
+        {r: "Narrator", t: "Don't cross the road on a red light."},
+        {r: "Narrator", t: "Cyclists."},
+        {r: "Narrator", t: "Always keep both hands on the handlebars."},
+        {r: "Narrator", t: "Wear helmets, and always use the cycle lane."},
+        {r: "Narrator", t: "Give a signal before you turn."},
+        {r: "Narrator", t: "Don't carry more than one passenger."},
+        {r: "Narrator", t: "Passengers."},
+        {r: "Narrator", t: "Fasten your seatbelt when you are in a car."},
+        {r: "Narrator", t: "Wait for buses to fully stop before getting on or off."},
+        {r: "Narrator", t: "Don't stick any body parts out of the window of a moving vehicle."}
+    ];
+
+    // QUESTION DATABASE
+    // Cấu trúc: question, correct (đáp án đúng), wrongs (các đáp án sai), trans, exp
+    const rawData = [
+        // GETTING STARTED
+        {
+            section: "Getting Started", type: "dialogue", content: dialogueGS,
+            q: "How does Lan often go to school?",
+            correct: "By bicycle", wrongs: ["By motorbike", "On foot"],
+            trans: "Lan thường đi học bằng gì? -> Xe đạp.",
+            exp: "Lan trả lời 'Yes' khi Mark hỏi 'Do you often cycle to school?'"
+        },
+        {
+            section: "Getting Started", type: "text",
+            q: "It normally takes Lan ______ to get to school.",
+            correct: "about 10 minutes", wrongs: ["20 minutes", "2 minutes"],
+            trans: "Lan thường mất khoảng 10 phút đến trường.",
+            exp: "Thông tin trong bài: 'About 10 minutes'."
+        },
+        {
+            section: "Getting Started", type: "text",
+            q: "Lan and Mark agree to go cycling ______.",
+            correct: "at the weekend", wrongs: ["tomorrow", "every day"],
+            trans: "Họ đồng ý đi xe đạp vào cuối tuần (Chủ nhật).",
+            exp: "Mark đề nghị: '...this Sunday?' -> Sunday là cuối tuần."
+        },
+        // VOCABULARY (A CLOSER LOOK 1)
+        {
+            section: "Vocabulary", type: "vis", vis: "🚲",
+            q: "Choose the correct phrase:",
+            correct: "ride a bike", wrongs: ["drive a bike", "fly a bike"],
+            trans: "Lái xe đạp (Ride a bike).",
+            exp: "Ride dùng cho xe 2 bánh hoặc cưỡi ngựa."
+        },
+        {
+            section: "Vocabulary", type: "vis", vis: "🚗",
+            q: "Choose the correct phrase:",
+            correct: "drive a car", wrongs: ["ride a car", "sail a car"],
+            trans: "Lái ô tô (Drive a car).",
+            exp: "Drive dùng cho xe 4 bánh có động cơ."
+        },
+        {
+            section: "Vocabulary", type: "vis", vis: "🚢",
+            q: "Choose the correct phrase:",
+            correct: "sail a boat", wrongs: ["drive a boat", "ride a boat"],
+            trans: "Chèo/Lái thuyền (Sail a boat).",
+            exp: "Sail dùng cho phương tiện đường thủy."
+        },
+        {
+            section: "Vocabulary", type: "vis", vis: "🚶",
+            q: "Choose the correct phrase:",
+            correct: "go on foot", wrongs: ["drive on foot", "ride on foot"],
+            trans: "Đi bộ (Go on foot).",
+            exp: "Cụm từ cố định: On foot."
+        },
+        // SIGNS
+        {
+            section: "Signs", type: "vis", vis: "🚦",
+            q: "What does this sign mean?",
+            correct: "Traffic lights", wrongs: ["No parking", "Hospital ahead"],
+            trans: "Đèn giao thông.",
+            exp: "Biển báo có 3 màu xanh, đỏ, vàng."
+        },
+        {
+            section: "Signs", type: "vis", vis: "🚫👉",
+            q: "What does this sign mean?",
+            correct: "No right turn", wrongs: ["Turn right", "Cycle lane"],
+            trans: "Cấm rẽ phải.",
+            exp: "Vòng tròn đỏ gạch chéo mũi tên rẽ phải."
+        },
+        {
+            section: "Signs", type: "vis", vis: "🏥",
+            q: "What does this sign mean?",
+            correct: "Hospital ahead", wrongs: ["School ahead", "No cycling"],
+            trans: "Bệnh viện phía trước.",
+            exp: "Biển chỉ dẫn có hình giường bệnh."
+        },
+        // GRAMMAR: SHOULD / SHOULDN'T
+        {
+            section: "Grammar: Should", type: "text",
+            q: "You ______ read that book. It's very interesting.",
+            correct: "should", wrongs: ["shouldn't", "mustn't"],
+            trans: "Bạn NÊN đọc cuốn sách đó.",
+            exp: "Lời khuyên làm một việc bổ ích."
+        },
+        {
+            section: "Grammar: Should", type: "text",
+            q: "You ______ drive so fast. It's dangerous.",
+            correct: "shouldn't", wrongs: ["should", "can"],
+            trans: "Bạn KHÔNG NÊN lái xe quá nhanh.",
+            exp: "Nguy hiểm -> Shouldn't."
+        },
+        // GRAMMAR: IT (DISTANCE)
+        {
+            section: "Grammar: Distance", type: "text",
+            q: "Choose the correct sentence:",
+            correct: "It is about 700m from my flat to the gym.", 
+            wrongs: ["It is 700m my flat to the gym.", "My flat is about 700m to the gym."],
+            trans: "Khoảng 700m từ căn hộ tôi đến phòng gym.",
+            exp: "Cấu trúc: It is + (about) distance + from A + to B."
+        },
+        // SKILLS 1: READING
+        {
+            section: "Reading Rules", type: "dialogue", content: readingRules,
+            q: "Where should pedestrians cross the street?",
+            correct: "At the zebra crossing", wrongs: ["Anywhere", "Near the bus stop"],
+            trans: "Người đi bộ nên sang đường ở vạch kẻ đường.",
+            exp: "Luật cho người đi bộ (Pedestrians)."
+        },
+        {
+            section: "Reading Rules", type: "text",
+            q: "Cyclists must always keep ______ on the handlebars.",
+            correct: "both hands", wrongs: ["one hand", "no hands"],
+            trans: "Người đi xe đạp phải giữ cả 2 tay trên ghi đông.",
+            exp: "Luật cho Cyclists."
+        },
+        {
+            section: "Reading Rules", type: "text",
+            q: "Passengers must NOT ______ in a moving vehicle.",
+            correct: "stick body parts out of the window", wrongs: ["wear a seatbelt", "sit still"],
+            trans: "Hành khách không được thò đầu/tay ra ngoài cửa sổ.",
+            exp: "Luật cho Passengers."
+        }
+    ];
+
+    /* =================================================================
+       2. CORE FUNCTIONS (SHUFFLE, AUDIO, RENDER)
+       ================================================================= */
+    
+    let currentIndex = 0;
+    let score = 0;
+    let autoNextTimer = null;
+    let audioCtx;
+    let bgmNode;
+    let bgmGain;
+    let isBgmOn = false;
+    const synth = window.speechSynthesis;
+
+    // --- RANDOMIZER ---
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    // --- AUDIO SYSTEM (Web Audio API for Music + Ducking) ---
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            bgmGain = audioCtx.createGain();
+            bgmGain.gain.value = 0.1; // Nhạc nền nhỏ vừa phải
+            bgmGain.connect(audioCtx.destination);
+        }
+    }
+
+    function playBGM() {
+        if (!isBgmOn || !audioCtx) return;
+        
+        // Tạo nhạc Pentatonic ngẫu nhiên (Vui tươi)
+        const freqs = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
+        const osc = audioCtx.createOscillator();
+        const noteGain = audioCtx.createGain();
+        
+        osc.frequency.value = freqs[Math.floor(Math.random() * freqs.length)];
+        osc.type = 'sine';
+        
+        noteGain.gain.setValueAtTime(0, audioCtx.currentTime);
+        noteGain.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.1);
+        noteGain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+
+        osc.connect(noteGain);
+        noteGain.connect(bgmGain);
+        
+        osc.start();
+        osc.stop(audioCtx.currentTime + 1);
+
+        setTimeout(() => { if(isBgmOn) playBGM(); }, 400); 
+    }
+
+    function toggleBGM() {
+        initAudio();
+        isBgmOn = !isBgmOn;
+        const btn = document.getElementById('bgm-btn');
+        
+        if (isBgmOn) {
+            btn.classList.add('active');
+            btn.innerText = "🎵 Nhạc: BẬT";
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            playBGM();
+        } else {
+            btn.classList.remove('active');
+            btn.innerText = "🔇 Nhạc: TẮT";
+        }
+    }
+
+    // --- SPEECH TTS WITH DUCKING ---
+    function speakContent(content, btnId) {
+        initAudio();
+        
+        // Ducking (Giảm nhạc nền)
+        if (isBgmOn && bgmGain) {
+            bgmGain.gain.cancelScheduledValues(audioCtx.currentTime);
+            bgmGain.gain.linearRampToValueAtTime(0.02, audioCtx.currentTime + 0.5);
+        }
+
+        const btn = document.getElementById(btnId);
+        btn.innerHTML = "⏹ Đang đọc...";
+        btn.classList.add('playing');
+        btn.onclick = () => { synth.cancel(); resetAudio(btnId); };
+
+        let idx = 0;
+        function speakNext() {
+            if (idx >= content.length || !synth.speaking && idx > 0) { // Check if cancelled
+                if (idx >= content.length) resetAudio(btnId);
+                return;
+            }
+
+            const item = content[idx];
+            const utter = new SpeechSynthesisUtterance(item.t);
+            utter.lang = 'en-US';
+
+            // Role Play Voices
+            const voices = synth.getVoices();
+            const male = voices.find(v => v.name.includes("Male") || v.name.includes("Google US English"));
+            const female = voices.find(v => v.name.includes("Female") || v.name.includes("Google UK English Female"));
+
+            if (item.r === "Mark") { if(male) utter.voice = male; utter.pitch = 0.9; }
+            else if (item.r === "Lan") { if(female) utter.voice = female; utter.pitch = 1.1; }
+            
+            utter.onend = () => { idx++; speakNext(); };
+            synth.speak(utter);
+        }
+        speakNext();
+    }
+
+    function resetAudio(btnId) {
+        // Restore BGM
+        if (isBgmOn && bgmGain) {
+            bgmGain.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 1);
+        }
+        const btn = document.getElementById(btnId);
+        if(btn) {
+            btn.innerHTML = "🔊 Nghe hội thoại/Bài đọc";
+            btn.classList.remove('playing');
+            // Re-bind original click event logic is handled by re-render or explicit check
+             // Simple hack: The onclick in HTML calls speakContent again
+             const data = rawData[currentIndex]; // Use current index context
+             btn.onclick = () => speakContent(data.content, btnId);
+        }
+    }
+
+    /* =================================================================
+       3. GAME ENGINE
+       ================================================================= */
+    
+    function startScreen() {
+        const main = document.getElementById('main-area');
+        main.innerHTML = `
+            <div class="start-screen">
+                <h1>🚦 TRAFFIC MASTER V9</h1>
+                <p>Nội dung chuẩn SGK Unit 7 - Tự động chuyển câu - Âm thanh thông minh</p>
+                <button class="btn-large" onclick="startGame()">BẮT ĐẦU NGAY ▶</button>
+            </div>
+        `;
+    }
+
+    function startGame() {
+        currentIndex = 0;
+        score = 0;
+        document.getElementById('score').innerText = "0";
+        // Pre-load voices
+        synth.getVoices();
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        // Reset Timer
+        clearTimeout(autoNextTimer);
+        document.getElementById('timer-bar').style.transition = 'none';
+        document.getElementById('timer-bar').style.width = '0%';
+        
+        // Stop audio if any
+        synth.cancel();
+
+        const data = rawData[currentIndex];
+        const main = document.getElementById('main-area');
+        
+        // Update Progress
+        document.getElementById('progress').style.width = `${((currentIndex+1)/rawData.length)*100}%`;
+
+        main.innerHTML = '';
+        
+        // 1. Render Section Tag
+        main.innerHTML += `<div class="section-tag">${data.section}</div>`;
+
+        // 2. Render Context (Dialogue/Reading) if exists
+        if (data.type === 'dialogue') {
+            let html = `<div class="context-box">`;
+            data.content.forEach(line => {
+                html += `<div style="margin-bottom:5px;"><span class="role ${line.r}">${line.r}:</span> ${line.t}</div>`;
+            });
+            html += `</div>`;
+            const btnId = `audio-${currentIndex}`;
+            html += `<button id="${btnId}" class="audio-trigger">🔊 Nghe hội thoại/Bài đọc</button>`;
+            main.innerHTML += html;
+            
+            setTimeout(() => {
+                document.getElementById(btnId).onclick = () => speakContent(data.content, btnId);
+            }, 0);
+        }
+
+        // 3. Render Visual if exists
+        if (data.type === 'vis') {
+            main.innerHTML += `<div class="visual-box">${data.vis}</div>`;
+        }
+
+        // 4. Render Question & Options (SHUFFLED)
+        // Create full options array
+        let options = [
+            { txt: data.correct, isCorrect: true },
+            ...data.wrongs.map(w => ({ txt: w, isCorrect: false }))
+        ];
+        // Shuffle
+        options = shuffleArray(options);
+
+        let qHtml = `<div class="question-text">Câu ${currentIndex + 1}: ${data.q}</div>`;
+        qHtml += `<div class="options-grid">`;
+        
+        options.forEach((opt, idx) => {
+            // Encode boolean in data attribute for checking
+            qHtml += `<button class="option-card" onclick="checkAnswer(this, ${opt.isCorrect})" data-idx="${idx}">${opt.txt}</button>`;
+        });
+        qHtml += `</div>`;
+
+        // 5. Feedback Panel (Hidden)
+        qHtml += `
+            <div id="feedback" class="feedback-panel">
+                <span id="fb-status" class="fb-status"></span>
+                <span class="fb-trans">Dịch: ${data.trans}</span>
+                <div class="fb-exp">💡 Giải thích: ${data.exp}</div>
+                <div class="auto-next-msg">⏳ Tự động chuyển câu sau 4s...</div>
+            </div>
+        `;
+
+        main.innerHTML += qHtml;
+    }
+
+    function checkAnswer(btn, isCorrect) {
+        // Prevent multiple clicks
+        const allBtns = document.querySelectorAll('.option-card');
+        if([...allBtns].some(b => b.classList.contains('disabled'))) return;
+        
+        // Lock buttons
+        allBtns.forEach(b => b.classList.add('disabled'));
+
+        const fb = document.getElementById('feedback');
+        const status = document.getElementById('fb-status');
+
+        if (isCorrect) {
+            btn.classList.add('correct');
+            status.innerText = "✅ CHÍNH XÁC!";
+            status.style.color = "var(--correct)";
+            score += 10;
+            document.getElementById('score').innerText = score;
+        } else {
+            btn.classList.add('wrong');
+            status.innerText = "❌ SAI RỒI!";
+            status.style.color = "var(--wrong)";
+            // Highlight correct one
+            // We need to find which button holds the correct text or check the data passed (simplified logic here)
+            // Since we passed isCorrect to function, we can't easily find the other button without loop
+            allBtns.forEach(b => {
+                 // Check valid logic: In this code structure, finding the button that triggered "true" is hard if we didn't store it. 
+                 // Better: Loop buttons and find which one corresponds to rawData[currentIndex].correct
+                 if(b.innerText === rawData[currentIndex].correct) b.classList.add('correct');
+            });
+        }
+
+        fb.classList.add('show');
+
+        // TRIGGER AUTO NEXT
+        const timerBar = document.getElementById('timer-bar');
+        timerBar.style.transition = 'width 4s linear';
+        timerBar.style.width = '100%';
+
+        autoNextTimer = setTimeout(() => {
+            nextQuestion();
+        }, 4000);
+    }
+
+    function nextQuestion() {
+        if (currentIndex < rawData.length - 1) {
+            currentIndex++;
+            loadQuestion();
+        } else {
+            finishGame();
+        }
+    }
+
+    function finishGame() {
+        const main = document.getElementById('main-area');
+        main.innerHTML = `
+            <div class="start-screen">
+                <h1 style="color:var(--correct)">HOÀN THÀNH!</h1>
+                <h2>Tổng điểm: ${score} / ${rawData.length * 10}</h2>
+                <button class="btn-large" onclick="location.reload()">Làm lại bài ↺</button>
+            </div>
+        `;
+        document.getElementById('timer-bar').style.display = 'none';
+    }
+
+    // Init
+    startScreen();
+
+</script>
+</body>
+</html>
